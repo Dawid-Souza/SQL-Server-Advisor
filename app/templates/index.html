@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Diagnóstico local e recomendações de configuração para instâncias Microsoft SQL Server.">
+  <title>SQL Server Advisor</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="SQL Server Advisor">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>SQL Server <strong>Advisor</strong></span>
+      </div>
+      <div class="local-badge"><span class="status-dot"></span> Execução local · porta 9000</div>
+    </header>
+
+    <main>
+      <section class="workspace" aria-labelledby="page-title">
+        <div class="intro">
+          <p class="eyebrow">DIAGNÓSTICO SOMENTE LEITURA</p>
+          <h1 id="page-title">Dimensione o SQL sem sufocar o Windows.</h1>
+          <p>Descubra as instâncias, compare a configuração atual e gere uma baseline que deixa memória e processamento livres para os outros serviços.</p>
+        </div>
+
+        <form id="scan-form" class="scan-panel">
+          <div class="field field-server">
+            <label for="server">Windows Server</label>
+            <div class="input-with-icon">
+              <span aria-hidden="true">⌁</span>
+              <input id="server" name="server" value="{{ default_server }}" autocomplete="off" spellcheck="false" required>
+            </div>
+            <small>Nome DNS, NetBIOS ou endereço IP</small>
+          </div>
+          <div class="field">
+            <label for="windows-authentication">Inventário do Windows</label>
+            <select id="windows-authentication" name="windows_authentication">
+              <option value="current">Usar minha sessão atual</option>
+              <option value="credentials">Informar credencial administrativa</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="authentication">Conexão com o SQL Server</label>
+            <select id="authentication" name="authentication">
+              <option value="windows">Integrada do Windows</option>
+              <option value="sql">Usuário do SQL Server</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="winrm-transport">Canal de execução remota</label>
+            <select id="winrm-transport" name="winrm_transport">
+              <option value="http">Automático / Kerberos (5985)</option>
+              <option value="https">WinRM HTTPS (5986)</option>
+            </select>
+            <small>Use HTTPS quando a máquina local não pertence ao domínio do servidor</small>
+          </div>
+          <div class="field windows-credential-field is-hidden">
+            <label for="windows-username">Administrador Windows</label>
+            <input id="windows-username" name="windows_username" value="{{ default_windows_username }}" autocomplete="username" placeholder="DOMINIO\usuario ou SERVIDOR\usuario">
+            <small>Use DOMÍNIO\usuário ou SERVIDOR\usuário para conta local</small>
+          </div>
+          <div class="field windows-credential-field is-hidden">
+            <label for="windows-password">Senha do Windows</label>
+            <input id="windows-password" name="windows_password" type="password" autocomplete="current-password">
+          </div>
+          <div class="field sql-credential-field is-hidden">
+            <label for="username">Usuário SQL</label>
+            <input id="username" name="username" autocomplete="username">
+          </div>
+          <div class="field sql-credential-field is-hidden">
+            <label for="password">Senha SQL</label>
+            <input id="password" name="password" type="password" autocomplete="current-password">
+          </div>
+          <button id="scan-button" type="submit">
+            <span class="button-label">Analisar servidor</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+          <button id="advanced-toggle" class="text-button" type="button" aria-expanded="false" aria-controls="advanced-fields">Ajustar reservas</button>
+          <div id="advanced-fields" class="advanced-fields" hidden>
+            <div class="field">
+              <label for="reserve-memory-percent">Reserva de RAM (%)</label>
+              <input id="reserve-memory-percent" name="reserve_memory_percent" type="number" min="10" max="60" value="25">
+            </div>
+            <div class="field">
+              <label for="reserve-memory-gb">Reserva mínima (GB)</label>
+              <input id="reserve-memory-gb" name="reserve_memory_gb" type="number" min="2" max="1024" value="4">
+            </div>
+            <div class="field">
+              <label for="reserve-cpus">CPUs reservadas</label>
+              <input id="reserve-cpus" name="reserve_logical_cpus" type="number" min="1" max="256" placeholder="Automático: 20%">
+            </div>
+            <label class="checkbox-field">
+              <input id="encrypt-connection" type="checkbox" checked>
+              <span>Criptografar a conexão com o SQL Server</span>
+            </label>
+            <label class="checkbox-field">
+              <input id="trust-certificate" type="checkbox" checked>
+              <span>Confiar no certificado apresentado pelo SQL Server</span>
+            </label>
+          </div>
+          <section class="rdp-mode" aria-labelledby="rdp-mode-title">
+            <div>
+              <p class="rdp-kicker">SEM ADMINISTRADOR LOCAL</p>
+              <h2 id="rdp-mode-title">Rodar remotamente pelo painel</h2>
+              <p>Configure o WinRM HTTPS uma única vez dentro do RDP. Depois, selecione <strong>WinRM HTTPS (5986)</strong>, informe a conta administrativa do servidor e use normalmente o botão <strong>Analisar servidor</strong>.</p>
+            </div>
+            <div class="rdp-actions">
+              <a class="rdp-button rdp-button-primary" href="/collector/Configure-SqlAdvisorWinRMHttps.ps1" download>Baixar configurador WinRM HTTPS</a>
+            </div>
+            <small>O configurador exige um certificado de computador válido para o DNS do servidor. Execute-o como administrador apenas no servidor.</small>
+            <div class="rdp-fallback">
+              <h3>Alternativa sem abrir canal remoto</h3>
+              <p>Se a política não permitir WinRM, colete dentro da sessão RDP e importe o JSON. O servidor remoto não precisa de Python.</p>
+            </div>
+            <ol class="rdp-steps">
+              <li>Copie o arquivo <strong>Collect-SqlServerAdvisor.ps1</strong> para o servidor pela sessão RDP.</li>
+              <li>Abra o PowerShell como administrador e execute <code>.\Collect-SqlServerAdvisor.ps1</code>.</li>
+              <li>Traga o JSON criado na Área de Trabalho e selecione-o abaixo.</li>
+            </ol>
+            <div class="rdp-actions">
+              <a class="rdp-button" href="/collector/Collect-SqlServerAdvisor.ps1" download>Baixar coletor PowerShell</a>
+              <label class="rdp-button rdp-button-primary" for="snapshot-file">Importar diagnóstico JSON</label>
+              <input id="snapshot-file" class="visually-hidden" type="file" accept=".json,application/json">
+            </div>
+            <small>Coleta somente leitura. Senhas não são gravadas no arquivo de diagnóstico.</small>
+          </section>
+        </form>
+      </section>
+
+      <section id="empty-state" class="empty-state" aria-live="polite">
+        <div class="empty-glyph" aria-hidden="true">⌁</div>
+        <h2>Pronto para analisar</h2>
+        <p>O painel lê hardware, serviços, Registro do Windows e configurações do SQL Server. Nenhuma configuração será alterada.</p>
+      </section>
+
+      <section id="loading-state" class="loading-state" hidden aria-live="polite">
+        <div class="radar" aria-hidden="true"><span></span></div>
+        <div>
+          <h2>Mapeando o servidor</h2>
+          <p id="loading-message">Consultando hardware e serviços do Windows…</p>
+        </div>
+      </section>
+
+      <section id="error-state" class="error-state" hidden role="alert">
+        <div class="error-icon" aria-hidden="true">!</div>
+        <div><h2>Não foi possível concluir a análise</h2><p id="error-message"></p></div>
+      </section>
+
+      <section id="results" class="results" hidden aria-live="polite">
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow">RESULTADO DO INVENTÁRIO</p>
+            <h2 id="host-title">Servidor</h2>
+            <p id="host-meta"></p>
+          </div>
+          <button id="new-scan" class="secondary-button" type="button">Nova análise</button>
+        </div>
+
+        <div id="warnings" class="warnings" hidden></div>
+        <div id="host-metrics" class="metric-grid"></div>
+
+        <div class="section-heading">
+          <div><p class="eyebrow">INSTÂNCIAS DETECTADAS</p><h2 id="instance-count">Recomendações</h2></div>
+          <div class="legend"><span><i class="priority high"></i>Ação recomendada</span><span><i class="priority info"></i>Validar</span></div>
+        </div>
+        <div id="instances" class="instance-list"></div>
+
+        <details class="methodology">
+          <summary>Como o orçamento foi calculado</summary>
+          <ul id="methodology-list"></ul>
+        </details>
+      </section>
+    </main>
+
+    <footer><span>Somente leitura</span><span>Credenciais não são armazenadas</span><span>Bind local 127.0.0.1</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
