@@ -2,6 +2,9 @@
 
 Painel web local, em Python e FastAPI, que inventaria um Windows Server, detecta as instâncias do Microsoft SQL Server e propõe uma **baseline explicada** para cada uma. O diagnóstico é somente leitura: o painel gera T-SQL e ações operacionais para revisão, e a aplicação fica sempre a cargo do DBA.
 
+<img width="1446" height="788" alt="image" src="https://github.com/user-attachments/assets/646a386c-1014-4654-9b3d-5b25e0cc99ab" />
+
+
 O orçamento de memória e CPU reserva recursos para o Windows e para os demais serviços do host. Em servidores com várias instâncias, a parcela restante é dividida de forma conservadora conforme o consumo observado.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
